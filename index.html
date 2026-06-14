@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Session Report Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #f0f4f8;
+    color: #1a1a2e;
+    min-height: 100vh;
+    padding: 32px 16px 64px;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+  .page-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #1a1a2e;
+  }
+  .page-header p {
+    color: #5a6a7e;
+    margin-top: 6px;
+    font-size: 0.92rem;
+  }
+
+  .form-card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    max-width: 780px;
+    margin: 0 auto 28px;
+    overflow: hidden;
+  }
+
+  .card-section-title {
+    background: #1a1a2e;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    padding: 10px 24px;
+  }
+
+  .card-body {
+    padding: 22px 24px;
+    display: grid;
+    gap: 18px;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #3a4a5e;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+
+  input[type="text"], input[type="date"], textarea {
+    border: 1.5px solid #dde3ea;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 0.92rem;
+    font-family: inherit;
+    color: #1a1a2e;
+    transition: border-color 0.15s;
+    width: 100%;
+    resize: vertical;
+    background: #fafbfc;
+  }
+  input[type="text"]:focus, input[type="date"]:focus, textarea:focus {
+    outline: none;
+    border-color: #4a6fa5;
+    background: #fff;
+  }
+
+  textarea { min-height: 80px; line-height: 1.55; }
+  textarea.tall { min-height: 110px; }
+
+  .tools-table-wrapper { overflow-x: auto; }
+  table.tools-input {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  table.tools-input th {
+    background: #f0f4f8;
+    text-align: left;
+    padding: 9px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #3a4a5e;
+    border: 1.5px solid #dde3ea;
+  }
+  table.tools-input td {
+    border: 1.5px solid #dde3ea;
+    padding: 4px 6px;
+    vertical-align: top;
+  }
+  table.tools-input td:first-child {
+    font-weight: 700;
+    color: #1a1a2e;
+    padding: 9px 10px;
+    white-space: nowrap;
+    font-size: 0.85rem;
+  }
+  table.tools-input textarea {
+    border: none;
+    background: transparent;
+    padding: 5px 6px;
+    min-height: 58px;
+    font-size: 0.87rem;
+    resize: vertical;
+  }
+  table.tools-input textarea:focus { outline: none; background: #fffbe6; border-radius: 4px; }
+
+  .generate-btn {
+    display: block;
+    margin: 0 auto;
+    background: #1a1a2e;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 48px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .generate-btn:hover { background: #2d3a5e; }
+  .generate-btn:active { transform: scale(0.98); }
+
+  #status {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 0.9rem;
+    color: #4a6fa5;
+    min-height: 22px;
+    font-weight: 600;
+  }
+
+  .top-bar {
+    max-width: 780px;
+    margin: 0 auto 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: -20px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .autosave-badge {
+    font-size: 0.75rem;
+    color: #6b8aad;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .autosave-badge.show { opacity: 1; }
+  .autosave-badge svg { flex-shrink: 0; }
+
+  .reset-btn {
+    background: transparent;
+    border: 1.5px solid #e0313155;
+    color: #c0392b;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .reset-btn:hover { background: #fdf0f0; border-color: #c0392b; }
+
+  /* confirm dialog overlay */
+  .confirm-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .confirm-overlay.active { display: flex; }
+  .confirm-box {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px 32px;
+    max-width: 360px;
+    width: 90%;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+    text-align: center;
+  }
+  .confirm-box h3 { font-size: 1.05rem; color: #1a1a2e; margin-bottom: 8px; }
+  .confirm-box p { font-size: 0.88rem; color: #5a6a7e; margin-bottom: 22px; line-height: 1.5; }
+  .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+  .confirm-actions button {
+    border-radius: 8px; border: none; padding: 9px 24px;
+    font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: background 0.15s;
+  }
+  .btn-cancel { background: #f0f4f8; color: #3a4a5e; }
+  .btn-cancel:hover { background: #dde3ea; }
+  .btn-confirm-reset { background: #c0392b; color: #fff; }
+  .btn-confirm-reset:hover { background: #a93226; }
+</style>
+</head>
+<body>
+
+<!-- Confirm reset dialog -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <h3>Clear all saved data?</h3>
+    <p>This will erase everything you have typed and cannot be undone.</p>
+    <div class="confirm-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-confirm-reset" onclick="confirmReset()">Yes, clear all</button>
+    </div>
+  </div>
+</div>
+
+<div class="page-header">
+  <h1>Session Report Generator</h1>
+  <p>Fill in the details below and click Generate PDF to download the report.</p>
+</div>
+
+<div class="top-bar">
+  <span class="autosave-badge" id="autosaveBadge">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <circle cx="6" cy="6" r="5.5" stroke="#6b8aad" stroke-width="1"/>
+      <path d="M3.5 6l1.8 1.8 3.2-3.6" stroke="#6b8aad" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Saved
+  </span>
+  <button class="reset-btn" onclick="openConfirm()">&#8634; Reset form</button>
+</div>
+
+<!-- SESSION DETAILS -->
+<div class="form-card">
+  <div class="card-section-title">Session Details</div>
+  <div class="card-body">
+    <div class="field-row">
+      <div class="field">
+        <label for="name">Name</label>
+        <input type="text" id="name" placeholder="Client name">
+      </div>
+      <div class="field">
+        <label for="date">Date</label>
+        <input type="date" id="date">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="duration">Duration</label>
+        <input type="text" id="duration" placeholder="e.g. 60 minutes">
+      </div>
+      <div class="field">
+        <label for="session_id">Client ID / Session No.</label>
+        <input type="text" id="session_id" placeholder="e.g. C001 / S05">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PARAGRAPHS -->
+<div class="form-card">
+  <div class="card-section-title">Session Content</div>
+  <div class="card-body">
+    <div class="field">
+      <label for="concerns">Primary Concerns Discussed</label>
+      <textarea id="concerns" class="tall" placeholder="Describe the primary concerns discussed during the session..."></textarea>
+    </div>
+    <div class="field">
+      <label for="triggers">Key Triggers Identified</label>
+      <textarea id="triggers" class="tall" placeholder="List or describe the key triggers identified..."></textarea>
+    </div>
+    <div class="field">
+      <label for="patterns">Behavioral Patterns</label>
+      <textarea id="patterns" class="tall" placeholder="Describe any behavioral patterns observed..."></textarea>
+    </div>
+    <div class="field">
+      <label for="indicators">Physiological Indicators</label>
+      <textarea id="indicators" class="tall" placeholder="Note any physiological indicators discussed..."></textarea>
+    </div>
+    <div class="field">
+      <label for="focus">Session Focus</label>
+      <textarea id="focus" placeholder="What was the primary focus of this session?"></textarea>
+    </div>
+    <div class="field">
+      <label for="goals">Goals Till Next Session</label>
+      <textarea id="goals" class="tall" placeholder="Goals to be achieved before the next session..."></textarea>
+    </div>
+    <div class="field">
+      <label for="plan">Follow-up Plan</label>
+      <textarea id="plan" class="tall" placeholder="Describe the follow-up plan..."></textarea>
+    </div>
+    <div class="field">
+      <label for="impression">Overall Impression</label>
+      <textarea id="impression" class="tall" placeholder="Overall impression from the session..."></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- TOOLS TABLE -->
+<div class="form-card">
+  <div class="card-section-title">Tools Assigned for Practice</div>
+  <div class="card-body">
+    <div class="tools-table-wrapper">
+      <table class="tools-input">
+        <thead>
+          <tr>
+            <th style="width:14%">Area</th>
+            <th style="width:30%">What to Do</th>
+            <th style="width:22%">Frequency</th>
+            <th style="width:34%">Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>MIND</td>
+            <td><textarea id="mind_what" placeholder="What to do..."></textarea></td>
+            <td><textarea id="mind_freq" placeholder="Frequency..."></textarea></td>
+            <td><textarea id="mind_purpose" placeholder="Purpose..."></textarea></td>
+          </tr>
+          <tr>
+            <td>BODY</td>
+            <td><textarea id="body_what" placeholder="What to do..."></textarea></td>
+            <td><textarea id="body_freq" placeholder="Frequency..."></textarea></td>
+            <td><textarea id="body_purpose" placeholder="Purpose..."></textarea></td>
+          </tr>
+          <tr>
+            <td>LIFESTYLE</td>
+            <td><textarea id="lifestyle_what" placeholder="What to do..."></textarea></td>
+            <td><textarea id="lifestyle_freq" placeholder="Frequency..."></textarea></td>
+            <td><textarea id="lifestyle_purpose" placeholder="Purpose..."></textarea></td>
+          </tr>
+          <tr>
+            <td>BEHAVIOUR</td>
+            <td><textarea id="behaviour_what" placeholder="What to do..."></textarea></td>
+            <td><textarea id="behaviour_freq" placeholder="Frequency..."></textarea></td>
+            <td><textarea id="behaviour_purpose" placeholder="Purpose..."></textarea></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<button class="generate-btn" onclick="generatePDF()">Generate PDF</button>
+<div id="status"></div>
+
+<script>
+const HEADER_URL    = "images/Screenshot%20from%202026-06-13%2023-31-11.png";
+const WATERMARK_URL = "images/Screenshot%20from%202026-06-13%2023-35-48.png";
+
+// ── AUTOSAVE ──────────────────────────────────────────────────────────────────
+const SAVE_KEY = 'sessionReport_v1';
+const FIELD_IDS = [
+  'name','date','duration','session_id',
+  'concerns','triggers','patterns','indicators','focus','goals','plan','impression',
+  'mind_what','mind_freq','mind_purpose',
+  'body_what','body_freq','body_purpose',
+  'lifestyle_what','lifestyle_freq','lifestyle_purpose',
+  'behaviour_what','behaviour_freq','behaviour_purpose'
+];
+
+let saveTimer = null;
+let badgeTimer = null;
+
+function saveToStorage(){
+  const data = {};
+  FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) data[id] = el.value;
+  });
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch(e){}
+  showSavedBadge();
+}
+
+function showSavedBadge(){
+  const badge = document.getElementById('autosaveBadge');
+  badge.classList.add('show');
+  clearTimeout(badgeTimer);
+  badgeTimer = setTimeout(()=> badge.classList.remove('show'), 2000);
+}
+
+function loadFromStorage(){
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    FIELD_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if(el && data[id] !== undefined) el.value = data[id];
+    });
+  } catch(e){}
+}
+
+function scheduleAutosave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToStorage, 600);
+}
+
+function openConfirm(){ document.getElementById('confirmOverlay').classList.add('active'); }
+function closeConfirm(){ document.getElementById('confirmOverlay').classList.remove('active'); }
+function confirmReset(){
+  try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+  FIELD_IDS.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  closeConfirm();
+  setStatus('Form cleared.');
+  setTimeout(()=>setStatus(''), 2500);
+}
+
+// Attach listeners after DOM ready
+document.addEventListener('DOMContentLoaded', ()=>{
+  loadFromStorage();
+  FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if(el){
+      el.addEventListener('input', scheduleAutosave);
+      el.addEventListener('change', scheduleAutosave);
+    }
+  });
+  // close overlay on backdrop click
+  document.getElementById('confirmOverlay').addEventListener('click', function(e){
+    if(e.target === this) closeConfirm();
+  });
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
+function setStatus(msg){ document.getElementById('status').textContent = msg; }
+
+function loadImage(url){
+  return new Promise((res,rej)=>{
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = ()=>{
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img,0,0);
+      res({ dataUrl: c.toDataURL('image/png'), w: img.naturalWidth, h: img.naturalHeight });
+    };
+    img.onerror = ()=>rej(new Error("Failed to load: "+url));
+    img.src = url;
+  });
+}
+
+function val(id){ return (document.getElementById(id)?.value || '').trim(); }
+
+function splitText(doc, text, maxWidth){
+  if(!text) return [''];
+  // Preserve newlines from textarea input
+  const paragraphs = text.split('\n');
+  const result = [];
+  for(const para of paragraphs){
+    if(para.trim() === ''){
+      result.push('');
+    } else {
+      const wrapped = doc.splitTextToSize(para, maxWidth);
+      result.push(...wrapped);
+    }
+  }
+  return result;
+}
+
+function drawHeader(doc, headerImg, pgW){
+  const margin = 40;
+  const usableW = pgW - margin*2;
+  const ratio = headerImg.h / headerImg.w;
+  const hH = usableW * ratio;
+  doc.addImage(headerImg.dataUrl,'PNG', margin, 20, usableW, hH);
+  return 20 + hH + 12;
+}
+
+// Watermark is drawn LAST on each page (after all content) with low opacity
+// We collect page numbers and draw watermarks at the end
+function drawWatermarkOnPage(doc, wmImg, pgW, pgH){
+  const wmW = pgW * 0.55;
+  const wmH = wmW * (wmImg.h / wmImg.w);
+  const x = (pgW - wmW)/2;
+  const y = (pgH - wmH)/2;
+  // Use GState for transparency so watermark appears over content but faded
+  try {
+    const gState = new doc.GState({ opacity: 0.10, 'fill-opacity': 0.10 });
+    doc.saveGraphicsState();
+    doc.setGState(gState);
+    doc.addImage(wmImg.dataUrl,'PNG', x, y, wmW, wmH);
+    doc.restoreGraphicsState();
+  } catch(e){
+    // fallback: draw without opacity
+    doc.addImage(wmImg.dataUrl,'PNG', x, y, wmW, wmH);
+  }
+}
+
+async function generatePDF(){
+  setStatus('Loading images...');
+  let headerImg, wmImg;
+  try{
+    [headerImg, wmImg] = await Promise.all([
+      loadImage(HEADER_URL), loadImage(WATERMARK_URL)
+    ]);
+  } catch(e){ setStatus('Error loading images: '+e.message); return; }
+
+  setStatus('Building PDF...');
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'portrait' });
+
+  const pgW = doc.internal.pageSize.getWidth();
+  const pgH = doc.internal.pageSize.getHeight();
+  const marginL = 42, marginR = 42;
+  const usableW = pgW - marginL - marginR;
+  const bottomMargin = 50;
+  const lineH = 13.5;
+  const labelFontSize = 9.5;
+  const bodyFontSize  = 9.5;
+  const rowPadV = 7, rowPadH = 9;
+
+  // Track total pages for watermark pass
+  let totalPages = 1;
+
+  function addNewPage(){
+    doc.addPage();
+    totalPages++;
+    return drawHeader(doc, headerImg, pgW);
+  }
+
+  function ensureSpace(y, needed){
+    if(y + needed > pgH - bottomMargin){
+      return addNewPage();
+    }
+    return y;
+  }
+
+  // ── Page 1 ───────────────────────────────────────────────────────────────
+  let y = drawHeader(doc, headerImg, pgW);
+  y += 6;
+
+  // ── SESSION DETAILS TABLE ─────────────────────────────────────────────────
+  // First row: col1 = "Session Details" (bold), col2 = all 4 details stacked
+  const col1W = 175;
+  const col2W = usableW - col1W;
+
+  const dateRaw = val('date');
+  let dateFormatted = dateRaw;
+  if(dateRaw){
+    const d = new Date(dateRaw+'T00:00:00');
+    dateFormatted = d.toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'});
+  }
+
+  // Build the combined cell text for col2 of session details row
+  const sdLines = [
+    'Name: ' + (val('name') || ''),
+    'Date: ' + (dateFormatted || ''),
+    'Duration: ' + (val('duration') || ''),
+    'Client ID / Session No.: ' + (val('session_id') || ''),
+  ];
+
+  // Wrap each sub-line to col2 width
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(bodyFontSize);
+  const sdAllLines = [];
+  for(const line of sdLines){
+    const wrapped = doc.splitTextToSize(line, col2W - rowPadH*2);
+    sdAllLines.push(...wrapped);
+  }
+
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(labelFontSize);
+  const sdCol1Lines = doc.splitTextToSize('Session Details', col1W - rowPadH*2);
+
+  const sdRowLines = Math.max(sdCol1Lines.length, sdAllLines.length);
+  const sdRowH = sdRowLines * lineH + rowPadV*2;
+
+  y = ensureSpace(y, sdRowH);
+
+  // Draw session details row — no backgrounds
+  doc.setDrawColor(100,100,100);
+  doc.setLineWidth(0.5);
+  doc.rect(marginL, y, usableW, sdRowH, 'S');
+  doc.line(marginL+col1W, y, marginL+col1W, y+sdRowH);
+
+  // Col1 text
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(labelFontSize);
+  doc.setTextColor(0,0,0);
+  sdCol1Lines.forEach((ln,i)=>{ doc.text(ln, marginL+rowPadH, y+rowPadV+lineH*(i+0.8)); });
+
+  // Col2 text
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(bodyFontSize);
+  sdAllLines.forEach((ln,i)=>{ doc.text(ln, marginL+col1W+rowPadH, y+rowPadV+lineH*(i+0.8)); });
+
+  y += sdRowH;
+
+  // ── CONTENT ROWS (section label | paragraph) ─────────────────────────────
+  const contentRows = [
+    { label: 'Primary Concerns Discussed', value: val('concerns') },
+    { label: 'Key Triggers Identified',   value: val('triggers') },
+    { label: 'Behavioral Patterns',        value: val('patterns') },
+    { label: 'Physiological Indicators',   value: val('indicators') },
+    { label: 'Session Focus',              value: val('focus') },
+    { label: 'Goals Till Next Session',    value: val('goals') },
+    { label: 'Follow-up Plan',             value: val('plan') },
+  ];
+
+  for(const row of contentRows){
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(labelFontSize);
+    const col1Lines = doc.splitTextToSize(row.label, col1W - rowPadH*2);
+
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(bodyFontSize);
+    const col2Lines = splitText(doc, row.value, col2W - rowPadH*2);
+
+    const linesNeeded = Math.max(col1Lines.length, col2Lines.length);
+    const rowH = linesNeeded * lineH + rowPadV*2;
+
+    // Check if this row fits; if not, it may span pages — we draw top portion
+    // For simplicity: if it fits, draw; else break page and draw fresh
+    if(y + rowH > pgH - bottomMargin){
+      // Try to start on a new page
+      y = addNewPage();
+    }
+
+    // Draw borders — no fill
+    doc.setDrawColor(100,100,100);
+    doc.setLineWidth(0.5);
+
+    // We need to handle rows that are taller than a page (very long text)
+    // Draw in segments if needed
+    let remainingCol1 = [...col1Lines];
+    let remainingCol2 = [...col2Lines];
+    let firstSegment = true;
+
+    while(remainingCol1.length > 0 || remainingCol2.length > 0){
+      const availH = pgH - bottomMargin - y;
+      const linesAvail = Math.max(1, Math.floor((availH - rowPadV*2) / lineH));
+      const seg1 = remainingCol1.splice(0, linesAvail);
+      const seg2 = remainingCol2.splice(0, linesAvail);
+      const segLines = Math.max(seg1.length, seg2.length, 1);
+      const segH = segLines * lineH + rowPadV * (firstSegment ? 2 : 1);
+
+      // Check if more content remains (for border style)
+      const hasMore = remainingCol1.length > 0 || remainingCol2.length > 0;
+
+      doc.rect(marginL, y, usableW, segH, 'S');
+      doc.line(marginL+col1W, y, marginL+col1W, y+segH);
+
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(labelFontSize);
+      doc.setTextColor(0,0,0);
+      seg1.forEach((ln,i)=>{ doc.text(ln, marginL+rowPadH, y+rowPadV+lineH*(i+0.8)); });
+
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(bodyFontSize);
+      seg2.forEach((ln,i)=>{ doc.text(ln, marginL+col1W+rowPadH, y+rowPadV+lineH*(i+0.8)); });
+
+      y += segH;
+      firstSegment = false;
+
+      if(hasMore){
+        y = addNewPage();
+      }
+    }
+  }
+
+  // ── OVERALL IMPRESSION ────────────────────────────────────────────────────
+  y += 20;
+  const impression = val('impression');
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(10.5);
+  const impLabelH = lineH + 4;
+  y = ensureSpace(y, impLabelH);
+  doc.setTextColor(0,0,0);
+  doc.text('Overall Impression:', marginL, y);
+  y += impLabelH;
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(bodyFontSize);
+  const impLines = splitText(doc, impression, usableW);
+  for(const ln of impLines){
+    y = ensureSpace(y, lineH);
+    doc.text(ln, marginL, y);
+    y += lineH;
+  }
+
+  // ── TOOLS ASSIGNED FOR PRACTICE ───────────────────────────────────────────
+  y += 22;
+  y = ensureSpace(y, lineH*2);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(0,0,0);
+  doc.text('Tools Assigned for Practice', marginL, y);
+  y += lineH * 1.7;
+
+  const toolsData = [
+    { area:'MIND',      what: val('mind_what'),      freq: val('mind_freq'),      purpose: val('mind_purpose') },
+    { area:'BODY',      what: val('body_what'),      freq: val('body_freq'),      purpose: val('body_purpose') },
+    { area:'LIFESTYLE', what: val('lifestyle_what'), freq: val('lifestyle_freq'), purpose: val('lifestyle_purpose') },
+    { area:'BEHAVIOUR', what: val('behaviour_what'), freq: val('behaviour_freq'), purpose: val('behaviour_purpose') },
+  ];
+
+  const tFrac = [0.13, 0.29, 0.20, 0.38];
+  const tWidths = tFrac.map(f => f * usableW);
+  const tHeaders = ['Area','What to Do','Frequency','Purpose'];
+  const tPadV = 6, tPadH = 7;
+
+  // Header row
+  const hRowH = lineH + tPadV*2;
+  y = ensureSpace(y, hRowH);
+  let tx = marginL;
+  doc.setDrawColor(100,100,100); doc.setLineWidth(0.5);
+  tHeaders.forEach((h,i)=>{
+    doc.rect(tx, y, tWidths[i], hRowH, 'S');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
+    doc.text(h, tx+tPadH, y+tPadV+lineH*0.8);
+    tx += tWidths[i];
+  });
+  y += hRowH;
+
+  // Data rows
+  for(const row of toolsData){
+    const cells = [row.area, row.what, row.freq, row.purpose];
+    const cellLines = cells.map((c,i)=> splitText(doc, c||'', tWidths[i]-tPadH*2));
+    const rowLineCount = Math.max(...cellLines.map(l=>l.length));
+    const rowH = rowLineCount * lineH + tPadV*2;
+
+    y = ensureSpace(y, rowH);
+    tx = marginL;
+    doc.setDrawColor(100,100,100); doc.setLineWidth(0.5);
+    cellLines.forEach((lines,i)=>{
+      doc.rect(tx, y, tWidths[i], rowH, 'S');
+      doc.setFont('helvetica', i===0 ? 'bold':'normal');
+      doc.setFontSize(bodyFontSize);
+      doc.setTextColor(0,0,0);
+      lines.forEach((ln,j)=>{ doc.text(ln, tx+tPadH, y+tPadV+lineH*(j+0.8)); });
+      tx += tWidths[i];
+    });
+    y += rowH;
+  }
+
+  // ── CLOSING SIGNATURE TEXT ────────────────────────────────────────────────
+  y += 30;
+  const sigBlockH = lineH*4;
+  y = ensureSpace(y, sigBlockH);
+
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(10);
+  doc.setTextColor(0,0,0);
+  doc.text('-- Somdatta De', marginL, y);
+  y += lineH * 2;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10);
+  doc.text('Team Mente Mirror', marginL, y);
+
+  // ── WATERMARK PASS — draw on ALL pages LAST ───────────────────────────────
+  // This ensures watermark is rendered on top of content (visually above)
+  // but with very low opacity so text remains clearly visible
+  for(let p = 1; p <= totalPages; p++){
+    doc.setPage(p);
+    drawWatermarkOnPage(doc, wmImg, pgW, pgH);
+  }
+
+  // ── SAVE ──────────────────────────────────────────────────────────────────
+  const filename = `Session_Report_${val('name').replace(/\s+/g,'_')||'Client'}_${val('date')||'Date'}.pdf`;
+  doc.save(filename);
+  setStatus('✓ PDF downloaded: ' + filename);
+}
+</script>
+</body>
+</html>
